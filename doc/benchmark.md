@@ -16,5 +16,6 @@ was 3m 30s.
 2. Second attempt, only go routines, no boundaries:
 
 As expected, we faced one of the problems that we may have if we don't control the boundaries of our program. 
-Around 500-550 go routines were spawned at the same time, one for each gio copy, causing the pc to freeze due to the 
-high CPU % usage.
+Around 500-550 go routines were spawned at the same time, one for each gio copy, which shouldn't be a problem 
+per se, but the hundreds of OS processes + heavy I/O contention created are. For this reason, the pc freeze 
+when the program is executed.

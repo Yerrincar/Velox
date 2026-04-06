@@ -3,7 +3,6 @@ package copyFiles
 import (
 	"Velox/tools"
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -15,22 +14,55 @@ import (
 type JoinFunc func(base, file string) string
 type CopyFunc func(ctx context.Context, src, dst string) error
 
+type Semaphore struct {
+	Channel chan struct{}
+}
+
+func (s *Semaphore) Acquire() {
+	s.Channel <- struct{}{}
+}
+
+func (s *Semaphore) Release() {
+	<-s.Channel
+}
+
 func BulkCopy(ctx context.Context, sourceDir string, files []string, destDir string, join JoinFunc, copyOne CopyFunc) error {
+	count := len(files)
+	if count == 0 {
+		return nil
+	}
+
+	sem := &Semaphore{Channel: make(chan struct{}, 3)}
 	var wg sync.WaitGroup
+	errChan := make(chan error, count)
 	for _, f := range files {
 		wg.Add(1)
 		go func(fileName string) {
 			defer wg.Done()
+			sem.Acquire()
+			defer sem.Release()
 			src := join(sourceDir, fileName)
 			dst := filepath.Join(destDir, fileName)
 
-			if err := copyOne(ctx, src, dst); err != nil {
-				log.Printf("Failed to copy %s: %v", fileName, err)
+			err := copyOne(ctx, src, dst)
+			if err != nil {
+				errChan <- err
 			}
 		}(f)
 	}
-	wg.Wait()
-	return nil
+
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	var firstError error
+	for err := range errChan {
+		if err != nil {
+			firstError = err
+		}
+	}
+	return firstError
 }
 
 func GetMTPCameraFile(ctx context.Context, suffix string) (string, []string, error) {
@@ -44,7 +76,7 @@ func GetMTPCameraFile(ctx context.Context, suffix string) (string, []string, err
 	if err != nil {
 		return "", nil, err
 	}
-	targetedFiles := make([]string, len(allFiles))
+	targetedFiles := make([]string, 0, len(allFiles))
 	for _, f := range allFiles {
 		if strings.HasSuffix(f, suffix) {
 			targetedFiles = append(targetedFiles, f)
@@ -56,25 +88,40 @@ func GetMTPCameraFile(ctx context.Context, suffix string) (string, []string, err
 func CopyFromTmpFolder(ctx context.Context, src, dst string) error {
 	sourceFile, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("failed to open source file: %w", err)
+		return err
 	}
 	defer sourceFile.Close()
 
 	destinationFile, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("failed to create destination file: %w", err)
+		return err
 	}
 	defer destinationFile.Close()
 
 	_, err = io.Copy(destinationFile, sourceFile)
 	if err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return err
 	}
 
-	fmt.Println("File copied successfully")
 	return nil
 }
 
 func LocalJoin(base, file string) string {
 	return filepath.Join(base, file)
+}
+
+func ListAllFiles(src, suffix string) ([]string, error) {
+	sourceFolder, err := os.ReadDir(src)
+	if err != nil {
+		log.Printf("Error trying to open source mock data folder: %v", err.Error())
+		return nil, err
+	}
+	files := make([]string, 0, len(sourceFolder))
+	for _, file := range sourceFolder {
+		if strings.HasSuffix(file.Name(), suffix) {
+			files = append(files, file.Name())
+		}
+	}
+
+	return files, nil
 }
