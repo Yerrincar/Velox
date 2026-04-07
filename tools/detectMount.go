@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var (
@@ -18,10 +19,18 @@ var (
 )
 
 func DetectPhoneMountRootURI(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "gio", "mount", "-li")
-	out, err := cmd.CombinedOutput()
+	var out []byte
+	err := reusableRetries(ctx, 3, func() error {
+		cmd := exec.CommandContext(ctx, "gio", "mount", "-li")
+		cmdOut, cmdErr := cmd.CombinedOutput()
+		out = cmdOut
+		if cmdErr != nil {
+			return fmt.Errorf("gio mount -li failed: %w\n%s", cmdErr, string(cmdOut))
+		}
+		return nil
+	})
 	if err != nil {
-		return "", fmt.Errorf("gio mount -li failed: %w\n%s", err, string(out))
+		return "", err
 	}
 
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
@@ -41,10 +50,18 @@ func DetectPhoneMountRootURI(ctx context.Context) (string, error) {
 }
 
 func ListMTPFiles(ctx context.Context, dirURI string) ([]string, error) {
-	cmd := exec.CommandContext(ctx, "gio", "list", dirURI)
-	out, err := cmd.CombinedOutput()
+	var out []byte
+	err := reusableRetries(ctx, 3, func() error {
+		cmd := exec.CommandContext(ctx, "gio", "list", dirURI)
+		cmdOut, cmdErr := cmd.CombinedOutput()
+		out = cmdOut
+		if cmdErr != nil {
+			return fmt.Errorf("gio list failed: %w\n%s", cmdErr, string(cmdOut))
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("gio list failed: %w\n%s", err, string(out))
+		return nil, err
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
@@ -66,15 +83,41 @@ func CopyFromMTP(ctx context.Context, srcURI, localDstPath string) error {
 	}
 	dstURI := (&url.URL{Scheme: "file", Path: absDst}).String()
 
-	cmd := exec.CommandContext(ctx, "gio", "copy", "--", srcURI, dstURI)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("gio copy failed: %w\n%s", err, string(out))
-	}
-	return nil
+	return reusableRetries(ctx, 3, func() error {
+		cmd := exec.CommandContext(ctx, "gio", "copy", "--", srcURI, dstURI)
+		out, cmdErr := cmd.CombinedOutput()
+		if cmdErr != nil {
+			return fmt.Errorf("gio copy failed: %w\n%s", cmdErr, string(out))
+		}
+		return nil
+	})
 }
 
 func JoinMTP(baseURI, fileName string) string {
 	baseURI = strings.TrimRight(baseURI, "/")
 	return baseURI + "/" + url.PathEscape(fileName)
+}
+
+func reusableRetries(ctx context.Context, maxRetries int, f func() error) error {
+	if maxRetries < 1 {
+		maxRetries = 1
+	}
+
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		if err = f(); err == nil {
+			return nil
+		}
+
+		if i == maxRetries-1 {
+			break
+		}
+
+		select {
+		case <-time.After(3 * time.Second):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return err
 }

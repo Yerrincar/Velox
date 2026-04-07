@@ -19,3 +19,9 @@ As expected, we faced one of the problems that we may have if we don't control t
 Around 500-550 go routines were spawned at the same time, one for each gio copy, which shouldn't be a problem 
 per se, but the hundreds of OS processes + heavy I/O contention created are. For this reason, the pc freeze 
 when the program is executed.
+
+
+### Times 
+
+- First version without concurrency: 3m 30s
+- First implementation with sempahores and maxConcurrency of 3: 2m 48s

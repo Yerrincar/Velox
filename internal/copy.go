@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 type JoinFunc func(base, file string) string
@@ -26,29 +27,36 @@ func (s *Semaphore) Release() {
 	<-s.Channel
 }
 
-func BulkCopy(ctx context.Context, sourceDir string, files []string, destDir string, join JoinFunc, copyOne CopyFunc) error {
+func BulkCopy(maxConcurrency int64, ctx context.Context, sourceDir string, files []string, destDir string, join JoinFunc, copyOne CopyFunc) error {
+	const perFileTimeout = 30 * time.Second
+
 	count := len(files)
 	if count == 0 {
 		return nil
 	}
+	if maxConcurrency <= 0 {
+		maxConcurrency = 1
+	}
 
-	sem := &Semaphore{Channel: make(chan struct{}, 3)}
+	sem := &Semaphore{Channel: make(chan struct{}, maxConcurrency)}
 	var wg sync.WaitGroup
 	errChan := make(chan error, count)
 	for _, f := range files {
-		wg.Add(1)
-		go func(fileName string) {
-			defer wg.Done()
-			sem.Acquire()
+		fileName := f
+		sem.Acquire()
+		wg.Go(func() {
 			defer sem.Release()
+			copyCtx, cancel := context.WithTimeout(ctx, perFileTimeout)
+			defer cancel()
+
 			src := join(sourceDir, fileName)
 			dst := filepath.Join(destDir, fileName)
 
-			err := copyOne(ctx, src, dst)
+			err := copyOne(copyCtx, src, dst)
 			if err != nil {
 				errChan <- err
 			}
-		}(f)
+		})
 	}
 
 	go func() {
@@ -58,7 +66,7 @@ func BulkCopy(ctx context.Context, sourceDir string, files []string, destDir str
 
 	var firstError error
 	for err := range errChan {
-		if err != nil {
+		if err != nil && firstError == nil {
 			firstError = err
 		}
 	}

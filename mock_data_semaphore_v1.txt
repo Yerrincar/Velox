@@ -1,0 +1,6 @@
+goos: linux
+goarch: amd64
+pkg: Velox/internal
+cpu: 12th Gen Intel(R) Core(TM) i5-12450H
+BenchmarkBulkCopy
+BenchmarkBulkCopy/Mock_Data_Test

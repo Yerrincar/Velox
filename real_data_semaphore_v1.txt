@@ -1,0 +1,13 @@
+goos: linux
+goarch: amd64
+pkg: Velox/internal
+cpu: 12th Gen Intel(R) Core(TM) i5-12450H
+BenchmarkBulkCopy
+BenchmarkBulkCopy/Real_Data_Test
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	207059552379 ns/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	203318381442 ns/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	202731319503 ns/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	204587222856 ns/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	197426102787 ns/op
+PASS
+ok  	Velox/internal	1015.129s
