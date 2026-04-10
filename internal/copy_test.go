@@ -34,7 +34,7 @@ func BenchmarkBulkCopy(b *testing.B) {
 			b.Fatalf("Error getting local path and files: %v", err.Error())
 		}
 		for i := 0; i < b.N; i++ {
-			if BulkCopy(3, ctx, sourceDir, files, destDir, LocalJoin, CopyFromTmpFolder) != nil {
+			if BulkCopy(3, ctx, sourceDir, files, destDir, LocalJoin, CopyBatchFromTmpFolder) != nil {
 				b.Fatalf("BulkCopy Error during BenchmarkBulkCopy Mock Data Test")
 			}
 		}

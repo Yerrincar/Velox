@@ -5,20 +5,24 @@ import (
 	mtp "Velox/tools"
 	"context"
 	"log"
+	"path/filepath"
 	"time"
 )
 
 func main() {
-	ctx := context.Background()
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*30))
+	setupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	destDir := "/home/yeray/Pictures/Temp/"
-	sourceDir, files, err := copyFiles.GetMTPCameraFile(ctx, "jpg")
+	destDir, err := filepath.Abs("/home/yeray/Pictures/Temp/")
+	if err != nil {
+		log.Print(err.Error())
+	}
+	sourceDir, files, err := copyFiles.GetMTPCameraFile(setupCtx, "jpg")
 	if err != nil {
 		log.Print(err.Error())
 	}
 
-	err = copyFiles.BulkCopy(3, ctxTimeout, sourceDir, files, destDir, mtp.JoinMTP, mtp.CopyFromMTP)
+	runCtx := context.Background()
+	err = copyFiles.BulkCopy(4, runCtx, sourceDir, files, destDir, mtp.JoinMTP, mtp.CopyFromMTP)
 	if err != nil {
 		log.Print(err.Error())
 	}

@@ -7,13 +7,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 )
 
 type JoinFunc func(base, file string) string
-type CopyFunc func(ctx context.Context, src, dst string) error
+type CopyFunc func(ctx context.Context, src []string, dst string) error
 
 type Semaphore struct {
 	Channel chan struct{}
@@ -27,13 +28,18 @@ func (s *Semaphore) Release() {
 	<-s.Channel
 }
 
-func BulkCopy(maxConcurrency int64, ctx context.Context, sourceDir string, files []string, destDir string, join JoinFunc, copyOne CopyFunc) error {
-	const perFileTimeout = 30 * time.Second
+func BulkCopy(maxConcurrency int64, ctx context.Context, sourceDir string, files []string, destDir string, join JoinFunc, copyOneChunk CopyFunc) error {
+	const perBatchTimeout = 3 * time.Minute
+	chunkSize := 200
+	absDestDir, err := filepath.Abs(destDir)
+	if err != nil {
+		return err
+	}
 
-	count := len(files)
-	if count == 0 {
+	if len(files) == 0 {
 		return nil
 	}
+	count := (len(files) + chunkSize - 1) / chunkSize
 	if maxConcurrency <= 0 {
 		maxConcurrency = 1
 	}
@@ -41,18 +47,18 @@ func BulkCopy(maxConcurrency int64, ctx context.Context, sourceDir string, files
 	sem := &Semaphore{Channel: make(chan struct{}, maxConcurrency)}
 	var wg sync.WaitGroup
 	errChan := make(chan error, count)
-	for _, f := range files {
-		fileName := f
+	for chunk := range slices.Chunk(files, chunkSize) {
+		srcs := make([]string, 0, len(chunk))
+		for _, f := range chunk {
+			srcs = append(srcs, join(sourceDir, f))
+		}
+		batch := srcs
 		sem.Acquire()
 		wg.Go(func() {
 			defer sem.Release()
-			copyCtx, cancel := context.WithTimeout(ctx, perFileTimeout)
+			copyCtx, cancel := context.WithTimeout(ctx, perBatchTimeout)
 			defer cancel()
-
-			src := join(sourceDir, fileName)
-			dst := filepath.Join(destDir, fileName)
-
-			err := copyOne(copyCtx, src, dst)
+			err := copyOneChunk(copyCtx, batch, absDestDir)
 			if err != nil {
 				errChan <- err
 			}
@@ -94,6 +100,8 @@ func GetMTPCameraFile(ctx context.Context, suffix string) (string, []string, err
 }
 
 func CopyFromTmpFolder(ctx context.Context, src, dst string) error {
+	_ = ctx
+
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return err
@@ -111,6 +119,17 @@ func CopyFromTmpFolder(ctx context.Context, src, dst string) error {
 		return err
 	}
 
+	return nil
+}
+
+func CopyBatchFromTmpFolder(ctx context.Context, src []string, dst string) error {
+	for _, srcPath := range src {
+		fileName := filepath.Base(srcPath)
+		dstPath := filepath.Join(dst, fileName)
+		if err := CopyFromTmpFolder(ctx, srcPath, dstPath); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

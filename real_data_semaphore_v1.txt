@@ -4,10 +4,9 @@ pkg: Velox/internal
 cpu: 12th Gen Intel(R) Core(TM) i5-12450H
 BenchmarkBulkCopy
 BenchmarkBulkCopy/Real_Data_Test
-BenchmarkBulkCopy/Real_Data_Test-12         	       1	207059552379 ns/op
-BenchmarkBulkCopy/Real_Data_Test-12         	       1	203318381442 ns/op
-BenchmarkBulkCopy/Real_Data_Test-12         	       1	202731319503 ns/op
-BenchmarkBulkCopy/Real_Data_Test-12         	       1	204587222856 ns/op
-BenchmarkBulkCopy/Real_Data_Test-12         	       1	197426102787 ns/op
-PASS
-ok  	Velox/internal	1015.129s
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	170642681457 ns/op	 9912904 B/op	   49931 allocs/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	169098803121 ns/op	 9893176 B/op	   49810 allocs/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	168590720678 ns/op	 9889992 B/op	   49780 allocs/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	169381483772 ns/op	 9864496 B/op	   49734 allocs/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	169270072291 ns/op	 9874688 B/op	   49743 allocs/op
+BenchmarkBulkCopy/Real_Data_Test-12         	       1	167765952978 ns/op	 9874624 B/op	   49724 allocs/op

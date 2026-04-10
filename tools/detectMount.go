@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -16,12 +15,13 @@ import (
 var (
 	errPhoneMountNotFound = errors.New("phone mtp mount not found")
 	mtpRootRe             = regexp.MustCompile(`default_location=(mtp://[^/]+/)`)
+	gioPath               = "/usr/bin/gio"
 )
 
 func DetectPhoneMountRootURI(ctx context.Context) (string, error) {
 	var out []byte
 	err := reusableRetries(ctx, 3, func() error {
-		cmd := exec.CommandContext(ctx, "gio", "mount", "-li")
+		cmd := exec.CommandContext(ctx, gioPath, "mount", "-li")
 		cmdOut, cmdErr := cmd.CombinedOutput()
 		out = cmdOut
 		if cmdErr != nil {
@@ -52,7 +52,7 @@ func DetectPhoneMountRootURI(ctx context.Context) (string, error) {
 func ListMTPFiles(ctx context.Context, dirURI string) ([]string, error) {
 	var out []byte
 	err := reusableRetries(ctx, 3, func() error {
-		cmd := exec.CommandContext(ctx, "gio", "list", dirURI)
+		cmd := exec.CommandContext(ctx, gioPath, "list", dirURI)
 		cmdOut, cmdErr := cmd.CombinedOutput()
 		out = cmdOut
 		if cmdErr != nil {
@@ -76,15 +76,13 @@ func ListMTPFiles(ctx context.Context, dirURI string) ([]string, error) {
 	return files, nil
 }
 
-func CopyFromMTP(ctx context.Context, srcURI, localDstPath string) error {
-	absDst, err := filepath.Abs(localDstPath)
-	if err != nil {
-		return err
-	}
-	dstURI := (&url.URL{Scheme: "file", Path: absDst}).String()
+func CopyFromMTP(ctx context.Context, srcURI []string, localDstPath string) error {
+	dstURI := (&url.URL{Scheme: "file", Path: localDstPath}).String()
 
+	args := []string{"copy", "--"}
+	args = append(append(args, srcURI...), dstURI)
 	return reusableRetries(ctx, 3, func() error {
-		cmd := exec.CommandContext(ctx, "gio", "copy", "--", srcURI, dstURI)
+		cmd := exec.CommandContext(ctx, gioPath, args...)
 		out, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			return fmt.Errorf("gio copy failed: %w\n%s", cmdErr, string(out))
