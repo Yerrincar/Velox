@@ -2,6 +2,7 @@ package main
 
 import (
 	copyFiles "Velox/internal"
+	"Velox/ssh"
 	mtp "Velox/tools"
 	"context"
 	"log"
@@ -23,6 +24,16 @@ func main() {
 
 	runCtx := context.Background()
 	err = copyFiles.BulkCopy(4, runCtx, sourceDir, files, destDir, mtp.JoinMTP, mtp.CopyFromMTP)
+	if err != nil {
+		log.Print(err.Error())
+	}
+
+	sourceTempDir := destDir
+	tempFiles, err := copyFiles.ListAllFiles(sourceTempDir, "jpg")
+	if err != nil {
+		log.Print(err.Error())
+	}
+	err = ssh.SSHConnection(5, runCtx, sourceTempDir, destDir, tempFiles, copyFiles.LocalJoin)
 	if err != nil {
 		log.Print(err.Error())
 	}
