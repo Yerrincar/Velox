@@ -99,6 +99,27 @@ func GetMTPCameraFile(ctx context.Context, suffix string) (string, []string, err
 	return filesPath, targetedFiles, nil
 }
 
+func GetADBCameraFile(ctx context.Context, suffix string) (string, []string, error) {
+	if err := mtp.EnsureADBDevice(ctx); err != nil {
+		return "", nil, err
+	}
+
+	filesPath := "/sdcard/DCIM/Camera"
+	allFiles, err := mtp.ListADBFiles(ctx, filesPath)
+	if err != nil {
+		return "", nil, err
+	}
+
+	targetedFiles := make([]string, 0, len(allFiles))
+	for _, f := range allFiles {
+		if strings.HasSuffix(f, suffix) {
+			targetedFiles = append(targetedFiles, f)
+		}
+	}
+
+	return filesPath, targetedFiles, nil
+}
+
 func CopyFromTmpFolder(ctx context.Context, src, dst string) error {
 	_ = ctx
 

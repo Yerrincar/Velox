@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -16,6 +19,7 @@ var (
 	errPhoneMountNotFound = errors.New("phone mtp mount not found")
 	mtpRootRe             = regexp.MustCompile(`default_location=(mtp://[^/]+/)`)
 	gioPath               = "/usr/bin/gio"
+	adbPath               = "/usr/bin/adb"
 )
 
 func DetectPhoneMountRootURI(ctx context.Context) (string, error) {
@@ -94,6 +98,64 @@ func CopyFromMTP(ctx context.Context, srcURI []string, localDstPath string) erro
 func JoinMTP(baseURI, fileName string) string {
 	baseURI = strings.TrimRight(baseURI, "/")
 	return baseURI + "/" + url.PathEscape(fileName)
+}
+
+func JoinADB(basePath, fileName string) string {
+	basePath = strings.TrimRight(basePath, "/")
+	return basePath + "/" + fileName
+}
+
+func EnsureADBDevice(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, adbPath, "devices")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("adb devices failed: %w\n%s", err, string(out))
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		if strings.HasSuffix(strings.TrimSpace(line), "\tdevice") {
+			return nil
+		}
+	}
+
+	return errors.New("no authorized adb device found")
+}
+
+func ListADBFiles(ctx context.Context, remoteDir string) ([]string, error) {
+	cmd := exec.CommandContext(ctx, adbPath, "shell", "ls", "-1", remoteDir)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("adb shell ls failed: %w\n%s", err, string(out))
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	files := make([]string, 0, len(lines))
+	for _, l := range lines {
+		name := strings.TrimSpace(strings.TrimSuffix(l, "\r"))
+		if name == "" || strings.HasSuffix(name, "/") {
+			continue
+		}
+		files = append(files, name)
+	}
+	return files, nil
+}
+
+func CopyFromADB(ctx context.Context, src []string, localDstDir string) error {
+	if err := os.MkdirAll(localDstDir, 0o755); err != nil {
+		return err
+	}
+
+	for _, remotePath := range src {
+		localPath := filepath.Join(localDstDir, path.Base(remotePath))
+		cmd := exec.CommandContext(ctx, adbPath, "pull", "-a", remotePath, localPath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("adb pull failed: %w\n%s", err, string(out))
+		}
+	}
+
+	return nil
 }
 
 func reusableRetries(ctx context.Context, maxRetries int, f func() error) error {

@@ -17,15 +17,17 @@ func main() {
 	if err != nil {
 		log.Print(err.Error())
 	}
-	sourceDir, files, err := copyFiles.GetMTPCameraFile(setupCtx, "jpg")
+	sourceDir, files, err := copyFiles.GetADBCameraFile(setupCtx, "jpg")
 	if err != nil {
 		log.Print(err.Error())
+		return
 	}
 
 	runCtx := context.Background()
-	err = copyFiles.BulkCopy(4, runCtx, sourceDir, files, destDir, mtp.JoinMTP, mtp.CopyFromMTP)
+	err = copyFiles.BulkCopy(3, runCtx, sourceDir, files, destDir, mtp.JoinADB, mtp.CopyFromADB)
 	if err != nil {
 		log.Print(err.Error())
+		return
 	}
 
 	sourceTempDir := destDir
