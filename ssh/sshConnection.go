@@ -15,14 +15,14 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir string, files []string, join copyFiles.JoinFunc) error {
+func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir string, files []string, join copyFiles.JoinFunc, runImmichUpload bool) error {
 	user := os.Getenv("VM_USER")
 	ip := os.Getenv("VM_IP")
 	auth := os.Getenv("VM_AUTH")
 	immichURL := os.Getenv("IMMICH_INSTANCE_URL")
 	immichAPIKey := os.Getenv("IMMICH_API_KEY")
 
-	if immichURL == "" || immichAPIKey == "" {
+	if runImmichUpload && (immichURL == "" || immichAPIKey == "") {
 		return errors.New("IMMICH_INSTANCE_URL and IMMICH_API_KEY must be set")
 	}
 
@@ -55,16 +55,18 @@ func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir
 		return err
 	}
 
-	session, err := conn.NewSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
+	if runImmichUpload {
+		session, err := conn.NewSession()
+		if err != nil {
+			return err
+		}
+		defer session.Close()
 
-	cmdCommand := immich.ImmichUpload(destDir, immichURL, immichAPIKey)
-	err = session.Run(cmdCommand)
-	if err != nil {
-		return err
+		cmdCommand := immich.ImmichUpload(destDir, immichURL, immichAPIKey)
+		err = session.Run(cmdCommand)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
