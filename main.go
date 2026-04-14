@@ -34,10 +34,18 @@ func main() {
 	tempFiles, err := copyFiles.ListAllFiles(sourceTempDir, "jpg")
 	if err != nil {
 		log.Print(err.Error())
+		return
 	}
 	vmDestDir := "/var/tmp/velox-staging"
 	err = ssh.SSHConnection(5, runCtx, sourceTempDir, vmDestDir, tempFiles, copyFiles.LocalJoin)
 	if err != nil {
 		log.Print(err.Error())
+		return
+	}
+
+	err = mtp.CleanupTempFolder(sourceTempDir)
+	if err != nil {
+		log.Print(err.Error())
+		return
 	}
 }

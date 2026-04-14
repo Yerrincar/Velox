@@ -4,6 +4,7 @@ import (
 	"Velox/immich"
 	copyFiles "Velox/internal"
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -18,6 +19,12 @@ func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir
 	user := os.Getenv("VM_USER")
 	ip := os.Getenv("VM_IP")
 	auth := os.Getenv("VM_AUTH")
+	immichURL := os.Getenv("IMMICH_INSTANCE_URL")
+	immichAPIKey := os.Getenv("IMMICH_API_KEY")
+
+	if immichURL == "" || immichAPIKey == "" {
+		return errors.New("IMMICH_INSTANCE_URL and IMMICH_API_KEY must be set")
+	}
 
 	config := &ssh.ClientConfig{
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
@@ -54,7 +61,7 @@ func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir
 	}
 	defer session.Close()
 
-	cmdCommand := immich.ImmichUpload(destDir)
+	cmdCommand := immich.ImmichUpload(destDir, immichURL, immichAPIKey)
 	err = session.Run(cmdCommand)
 	if err != nil {
 		return err
