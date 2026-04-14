@@ -35,7 +35,8 @@ func main() {
 	if err != nil {
 		log.Print(err.Error())
 	}
-	err = ssh.SSHConnection(5, runCtx, sourceTempDir, destDir, tempFiles, copyFiles.LocalJoin)
+	vmDestDir := "/var/tmp/velox-staging"
+	err = ssh.SSHConnection(5, runCtx, sourceTempDir, vmDestDir, tempFiles, copyFiles.LocalJoin)
 	if err != nil {
 		log.Print(err.Error())
 	}

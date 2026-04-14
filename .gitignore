@@ -10,7 +10,7 @@
 *.prof
 *.log
 *.txt
-
+todo.md
 # Test binary, built with `go test -c`
 *.test
 

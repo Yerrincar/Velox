@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"Velox/immich"
 	copyFiles "Velox/internal"
 	"context"
 	"io"
@@ -14,7 +15,7 @@ import (
 )
 
 func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir string, files []string, join copyFiles.JoinFunc) error {
-	user := os.Getenv("VM_HOST")
+	user := os.Getenv("VM_USER")
 	ip := os.Getenv("VM_IP")
 	auth := os.Getenv("VM_AUTH")
 
@@ -44,6 +45,18 @@ func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir
 	}
 
 	if err := copyFiles.BulkCopy(maxConcurrency, ctx, sourceDir, files, destDir, join, copyViaSFTP); err != nil {
+		return err
+	}
+
+	session, err := conn.NewSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	cmdCommand := immich.ImmichUpload(destDir)
+	err = session.Run(cmdCommand)
+	if err != nil {
 		return err
 	}
 	return nil
