@@ -8,9 +8,15 @@ import (
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Print("No .env file found, using system environment variables")
+	}
+
 	setupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	destDir, err := filepath.Abs("/home/yeray/Pictures/Temp/")
