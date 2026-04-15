@@ -7,13 +7,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -22,19 +21,21 @@ func main() {
 	}
 
 	transfer := flag.String("transfer", "full", "Transfer scope: full|semi|partial")
-	mode := flag.String("mode", "adb", "Mobile mode: adb|mtp (recommended: adb)")
+	mode := flag.String("mode", "adb", "Mobile mode: adb|mtp (recommended: \"adb\" for faster speed)")
 	vmIP := flag.String("ip", "", "VM IP override (optional, overrides VM_IP)")
 	vmFolder := flag.String("folder", "", "VM destination folder (default: /var/tmp/velox-staging)")
+	suffix := flag.String("suffix", "jpg", "File suffix to transfer (jpg|jpeg|png|mp4)")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Velox - photo transfer pipeline\n\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  velox [--transfer full|semi|partial] [--mode adb|mtp] [--ip <vm-ip>] [--folder <vm-folder>]\n\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  velox [--transfer full|semi|partial] [--mode adb|mtp] [--ip <vm-ip>] [--folder <vm-folder>] [--suffix <ext>]\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
 	*transfer = strings.ToLower(strings.TrimSpace(*transfer))
 	*mode = strings.ToLower(strings.TrimSpace(*mode))
+	*suffix = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(*suffix, ".")))
 
 	if *transfer != "full" && *transfer != "semi" && *transfer != "partial" {
 		log.Print("invalid --transfer value, use: full|semi|partial")
@@ -44,6 +45,24 @@ func main() {
 
 	if *mode != "adb" && *mode != "mtp" {
 		log.Print("invalid --mode value, use: adb|mtp")
+		flag.Usage()
+		return
+	}
+
+	if *suffix == "" {
+		log.Print("invalid --suffix value, use a file extension like jpg|jpeg|png")
+		flag.Usage()
+		return
+	}
+
+	allowedSuffixes := map[string]struct{}{
+		"jpg":  {},
+		"jpeg": {},
+		"png":  {},
+		"mp4":  {},
+	}
+	if _, ok := allowedSuffixes[*suffix]; !ok {
+		log.Print("invalid --suffix value, use: jpg|jpeg|png|mp4")
 		flag.Usage()
 		return
 	}
@@ -71,11 +90,11 @@ func main() {
 	)
 
 	if *mode == "adb" {
-		sourceDir, files, err = copyFiles.GetADBCameraFile(setupCtx, "jpg")
+		sourceDir, files, err = copyFiles.GetADBCameraFile(setupCtx, *suffix)
 		join = mtp.JoinADB
 		copyBatch = mtp.CopyFromADB
 	} else {
-		sourceDir, files, err = copyFiles.GetMTPCameraFile(setupCtx, "jpg")
+		sourceDir, files, err = copyFiles.GetMTPCameraFile(setupCtx, *suffix)
 		join = mtp.JoinMTP
 		copyBatch = mtp.CopyFromMTP
 	}
@@ -96,7 +115,7 @@ func main() {
 	}
 
 	sourceTempDir := destDir
-	tempFiles, err := copyFiles.ListAllFiles(sourceTempDir, "jpg")
+	tempFiles, err := copyFiles.ListAllFiles(sourceTempDir, *suffix)
 	if err != nil {
 		log.Print(err.Error())
 		return
