@@ -30,7 +30,7 @@ func (s *Semaphore) Release() {
 
 func BulkCopy(maxConcurrency int64, ctx context.Context, sourceDir string, files []string, destDir string, join JoinFunc, copyOneChunk CopyFunc) error {
 	const perBatchTimeout = 3 * time.Minute
-	chunkSize := 200
+	chunkSize := 50
 	absDestDir, err := filepath.Abs(destDir)
 	if err != nil {
 		return err

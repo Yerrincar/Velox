@@ -5,10 +5,10 @@ import (
 	copyFiles "Velox/internal"
 	"context"
 	"errors"
-	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -41,7 +41,11 @@ func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir
 	}
 	defer conn.Close()
 
-	sftpClient, err := sftp.NewClient(conn)
+	sftpClient, err := sftp.NewClient(
+		conn,
+		sftp.UseConcurrentWrites(true),
+		sftp.MaxConcurrentRequestsPerFile(128),
+	)
 	if err != nil {
 		return err
 	}
@@ -72,18 +76,49 @@ func SSHConnection(maxConcurrency int64, ctx context.Context, sourceDir, destDir
 }
 
 func copyBatchViaSFTP(ctx context.Context, sftpClient *sftp.Client, src []string, dst string) error {
+	const perBatchConcurrency = 4
+
 	if err := sftpClient.MkdirAll(dst); err != nil {
 		return err
 	}
 
+	workerCount := min(perBatchConcurrency, len(src))
+	sem := make(chan struct{}, workerCount)
+	errChan := make(chan error, len(src))
+	var wg sync.WaitGroup
+
 	for _, srcPath := range src {
-		fileName := filepath.Base(srcPath)
-		dstPath := filepath.Join(dst, fileName)
-		if err := copyOneViaSFTP(ctx, sftpClient, srcPath, dstPath); err != nil {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
+
+		srcPath := srcPath
+		fileName := filepath.Base(srcPath)
+		dstPath := filepath.Join(dst, fileName)
+
+		sem <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-sem }()
+
+			if err := copyOneViaSFTP(ctx, sftpClient, srcPath, dstPath); err != nil {
+				errChan <- err
+			}
+		})
 	}
-	return nil
+
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	var firstErr error
+	for err := range errChan {
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+
+	return firstErr
 }
 
 func copyOneViaSFTP(ctx context.Context, sftpClient *sftp.Client, src, dst string) error {
@@ -101,6 +136,9 @@ func copyOneViaSFTP(ctx context.Context, sftpClient *sftp.Client, src, dst strin
 	}
 	defer destinationFile.Close()
 
-	_, err = io.Copy(destinationFile, sourceFile)
+	_, err = destinationFile.ReadFrom(sourceFile)
+	if err != nil {
+		_ = sftpClient.Remove(dst)
+	}
 	return err
 }
