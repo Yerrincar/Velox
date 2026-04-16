@@ -8,12 +8,13 @@
 *.so
 *.dylib
 *.prof
+*prof
 *.log
 *.txt
 todo.md
 # Test binary, built with `go test -c`
 *.test
-
+./*.prof
 # Code coverage profiles and other test artifacts
 *.out
 coverage.*

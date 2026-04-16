@@ -1,8 +1,8 @@
 # Velox
 
-Fast photo pipeline.
+Fast and automatic photo pipeline.
 
-CLI tool for moving media from Android to PC, then optionally, and recommended, to a VM, and finally into Immich.
+A purely "bespoke" CLI tool for moving media from Android to PC, then optionally, and recommended, to a VM, and finally into Immich.
 
 ## Highlights
 
