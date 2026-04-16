@@ -76,7 +76,7 @@ func main() {
 
 	setupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	destDir, err := filepath.Abs("/home/yeray/Pictures/Temp/")
+	destDir, err := filepath.Abs(mtp.DefaultLocalStagingDir())
 	if err != nil {
 		log.Print(err.Error())
 		return
