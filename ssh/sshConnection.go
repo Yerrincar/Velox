@@ -149,7 +149,7 @@ func runRemoteImmichUpload(ctx context.Context, destDir string) error {
 }
 
 func copyBatchViaSFTP(ctx context.Context, sftpClient *sftp.Client, src []string, dst string) error {
-	const perBatchConcurrency = 4
+	const perBatchConcurrency = 1
 
 	if err := sftpClient.MkdirAll(dst); err != nil {
 		return err
